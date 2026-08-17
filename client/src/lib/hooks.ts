@@ -10,13 +10,31 @@ export interface CardData {
   rsvpContact: string;
   backgroundColor: string;
 }
-
+export interface CustomElement {
+  id: string;
+  type: 'text' | 'image' | 'shape';
+  content: string; // Text content, or image URL, or shape name/class
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+  fontSize?: number;
+}
 export interface Template {
   id: number;
   name: string;
   category: string;
   thumbnailUrl: string;
   backgroundUrl: string;
+  cardStyle?: {
+    borderStyle?: 'gold' | 'floral' | 'royal' | 'minimal' | 'none';
+    fontFamilyTitle?: string;
+    fontFamilyBody?: string;
+    fontColor?: string;
+    overlayOpacity?: number;
+    dividerStyle?: 'leaf' | 'line' | 'star' | 'none';
+  };
 }
 
 export function useTemplates() {

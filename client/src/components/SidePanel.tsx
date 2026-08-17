@@ -10,7 +10,7 @@ import { ColorPicker } from "./ui/color-picker";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles, Key, Wand2 } from "lucide-react";
 
 
 // Define types for our image upload response
@@ -38,6 +38,71 @@ const SidePanel = ({
   const [activeCategory, setActiveCategory] = useState("All");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const { toast } = useToast();
+
+  // AI Generator States
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleAiGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiPrompt.trim()) {
+      toast({
+        title: "Please enter a prompt",
+        description: "Describe what kind of invitation you want (e.g. Wedding, Birthday, Party style).",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/generate-card-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          customApiKey: customApiKey || undefined
+        })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to generate card content");
+      }
+      
+      setCardData({
+        eventName: data.eventName || cardData.eventName,
+        date: data.date || cardData.date,
+        time: data.time || cardData.time,
+        location: data.location || cardData.location,
+        description: data.description || cardData.description,
+        rsvpContact: data.rsvpContact || cardData.rsvpContact,
+        backgroundColor: data.backgroundColor || cardData.backgroundColor,
+      });
+
+      if (customApiKey) {
+        localStorage.setItem("gemini_api_key", customApiKey);
+      }
+
+      toast({
+        title: "AI Card Generated!",
+        description: "Your card content has been loaded successfully.",
+        variant: "default"
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "AI Generation failed",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const colorOptions = [
     { color: "hsl(265 84% 50%)", name: "Purple" },
@@ -216,24 +281,30 @@ const SidePanel = ({
   return (
     <div className="md:w-1/3 lg:w-1/4 border-r border-dark-border overflow-y-auto mobile-full bg-dark-surface">
       <Tabs defaultValue="templates">
-        <TabsList className="w-full grid grid-cols-3 h-16 bg-dark-light border-b border-dark-border rounded-none">
+        <TabsList className="w-full grid grid-cols-4 h-16 bg-dark-light border-b border-dark-border rounded-none">
           <TabsTrigger 
             value="templates" 
-            className="py-4 font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+            className="py-4 text-xs font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
           >
             Templates
           </TabsTrigger>
           <TabsTrigger 
-            value="upload" 
-            className="py-4 font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+            value="ai-builder" 
+            className="py-4 text-xs font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
           >
-            Upload
+            AI Generator
           </TabsTrigger>
           <TabsTrigger 
             value="data" 
-            className="py-4 font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+            className="py-4 text-xs font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
           >
-            Data
+            Details
+          </TabsTrigger>
+          <TabsTrigger 
+            value="upload" 
+            className="py-4 text-xs font-medium text-gray-400 data-[state=active]:text-white data-[state=active]:bg-dark-light data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+          >
+            Upload
           </TabsTrigger>
         </TabsList>
 
@@ -282,6 +353,62 @@ const SidePanel = ({
           >
             Show more templates <ChevronDownIcon className="ml-1 h-4 w-4" />
           </Button>
+        </TabsContent>
+
+        <TabsContent value="ai-builder" className="p-4 focus-visible:outline-none">
+          <div className="flex items-center space-x-2 mb-4">
+            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+            <h2 className="text-lg font-heading font-medium text-white">AI Card Generator</h2>
+          </div>
+          
+          <form onSubmit={handleAiGenerate} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Describe your event card</label>
+              <Textarea 
+                placeholder="Example: Gold & Red traditional Indian Wedding card for Arjun & Meera on 18th December. Include a romantic quote."
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                className="!bg-dark-light/50 border-dark-border !text-white min-h-[100px] placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isGenerating}
+              className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-purple-600 hover:to-primary text-white shadow-md shadow-primary/20 flex items-center justify-center gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating card...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" />
+                  Generate with Gemini
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-dark-border/40 pt-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Suggested Prompts</h4>
+            <div className="space-y-2">
+              {[
+                "Traditional Red & Marigold Indian Wedding Invitation, Rohan & Priya",
+                "Neon birthday party card for Rohan, 25th birthday, starry night vibe",
+                "Luxury Golden Anniversary card for parents with a heart warming quote"
+              ].map((suggestion, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setAiPrompt(suggestion)}
+                  className="w-full text-left text-xs bg-dark-light/30 hover:bg-dark-light/60 text-gray-300 p-2.5 rounded-lg border border-dark-border/20 transition-all truncate"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="upload" className="p-4 focus-visible:outline-none">
@@ -348,7 +475,7 @@ const SidePanel = ({
                 type="text" 
                 value={cardData.eventName} 
                 onChange={(e) => setCardData({ eventName: e.target.value })}
-                className="form-input bg-white border-dark-border text-black"
+                className="!bg-dark-light/50 border-dark-border !text-white placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
               />
             </div>
             
@@ -359,7 +486,7 @@ const SidePanel = ({
                   type="date" 
                   value={cardData.date} 
                   onChange={(e) => setCardData({ date: e.target.value })}
-                  className="form-input bg-white border-dark-border text-black"
+                  className="!bg-dark-light/50 border-dark-border !text-white placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
                 />
               </div>
               <div>
@@ -368,7 +495,7 @@ const SidePanel = ({
                   type="time" 
                   value={cardData.time} 
                   onChange={(e) => setCardData({ time: e.target.value })}
-                  className="form-input bg-white border-dark-border text-black"
+                  className="!bg-dark-light/50 border-dark-border !text-white placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
                 />
               </div>
             </div>
@@ -379,7 +506,7 @@ const SidePanel = ({
                 type="text" 
                 value={cardData.location} 
                 onChange={(e) => setCardData({ location: e.target.value })}
-                className="form-input bg-white border-dark-border text-black"
+                className="!bg-dark-light/50 border-dark-border !text-white placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
               />
             </div>
             
@@ -389,7 +516,7 @@ const SidePanel = ({
                 rows={3}
                 value={cardData.description} 
                 onChange={(e) => setCardData({ description: e.target.value })}
-                className="form-input bg-white border-dark-border text-black min-h-[80px]"
+                className="!bg-dark-light/50 border-dark-border !text-white min-h-[80px] placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
               />
             </div>
             
@@ -399,7 +526,7 @@ const SidePanel = ({
                 type="text" 
                 value={cardData.rsvpContact} 
                 onChange={(e) => setCardData({ rsvpContact: e.target.value })}
-                className="form-input bg-white border-dark-border text-black"
+                className="!bg-dark-light/50 border-dark-border !text-white placeholder-gray-500 focus:border-primary focus:ring-1 focus:ring-primary focus:bg-dark-light"
               />
             </div>
             

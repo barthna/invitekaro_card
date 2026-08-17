@@ -18,50 +18,38 @@ const CardTextElement = ({
   const [isDragging, setIsDragging] = useState(false);
   const [position2D, setPosition2D] = useState({ x: 0, y: 0 });
   const elementRef = useRef<HTMLDivElement>(null);
-  const startPosRef = useRef({ x: 0, y: 0 });
-  const elementStartPosRef = useRef({ x: 0, y: 0 });
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!editable) return;
 
-    setIsDragging(true);
-    startPosRef.current = { x: e.clientX, y: e.clientY };
-    elementStartPosRef.current = { ...position2D };
-
     // Prevent text selection during drag
     document.body.style.userSelect = 'none';
 
-    // Add event listeners for move and up events
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPos = { ...position2D };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      setPosition2D({
+        x: startPos.x + deltaX,
+        y: startPos.y + deltaY
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      setIsDragging(false);
+    };
+
+    setIsDragging(true);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return;
-
-    const deltaX = e.clientX - startPosRef.current.x;
-    const deltaY = e.clientY - startPosRef.current.y;
-
-    setPosition2D({
-      x: elementStartPosRef.current.x + deltaX,
-      y: elementStartPosRef.current.y + deltaY
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    document.body.style.userSelect = ''; // Restore text selection behavior
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
-
-  useEffect(() => {
-    // Clean up mouse events when the component unmounts or if drag stops
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
 
   return (
     <div 
